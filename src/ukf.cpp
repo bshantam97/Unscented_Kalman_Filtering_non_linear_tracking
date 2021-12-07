@@ -20,6 +20,9 @@ UKF::UKF() {
   // Predicted Sigma points matrix
   Eigen::MatrixXd Xsig_pred_ = Eigen::MatrixXd(n_x_, 2*n_aug_ + 1);
 
+  // Initialize the weights vector
+  Eigen::VectorXd weights_ = Eigen::VectorXd(2*n_aug_ + 1);
+
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
 
@@ -184,6 +187,30 @@ void UKF::Prediction(double delta_t) {
                       delta_t*yaw_acc_noise_;
     // Write predicted sigma points into the right column
     Xsig_pred_.col(i) = Xsig_aug_.col(i).head(n_x_) + process_model_ + process_noise_;
+  }
+
+  /**
+   * @brief Predict the mean and covariance
+   * 
+   */
+
+  // Set weights
+  for (int i = 0; i < 2*n_aug_ + 1; i++) {
+    if (i == 0) weights_(i) = (lambda_ / (lambda_ + n_aug_));
+    else weights_(i) = (0.5 / (lambda_+n_aug_));
+  }
+
+  // State mean prediction
+  for (int i = 0; i < 2*n_aug_ + 1; i++) {
+    x_+= weights_(i)*Xsig_pred_.col(i);
+  }
+
+  // State Covariance prediction
+  for (int i = 0; i < 2*n_aug_ + 1; i++) {
+    Eigen::MatrixXd diff_ = Xsig_pred_.col(i) - x_;
+    while (diff_(3) > M_PI) diff_(3) -= 2.*M_PI;
+    while (diff_(3) < -M_PI) diff_(3) += 2.*M_PI;
+    P_ += weights_(i)*(diff_)*(diff_.transpose());
   }
 }
 
