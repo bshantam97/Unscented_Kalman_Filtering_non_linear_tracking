@@ -211,7 +211,7 @@ void UKF::Prediction(double delta_t) {
     while (diff_(3) > M_PI) diff_(3) -= 2.*M_PI;
     while (diff_(3) < -M_PI) diff_(3) += 2.*M_PI;
     P_ += weights_(i)*(diff_)*(diff_.transpose());
-  }
+  } 
 }
 
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
@@ -221,6 +221,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the lidar NIS, if desired.
    */
+
 }
 
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
@@ -230,4 +231,78 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
    * covariance, P_.
    * You can also calculate the radar NIS, if desired.
    */
+
+  // Matrix for sigma points in measurement space
+  Eigen::MatrixXd Zsig = Eigen::MatrixXd(n_z_, 2*n_aug_ + 1);
+
+  // Mean predicted measurement
+  Eigen::VectorXd z_pred_ = Eigen::VectorXd(n_z_);
+
+  // Measurement covariance matrix S
+  Eigen::MatrixXd S_ = Eigen::MatrixXd(n_z_,n_z_);
+
+  // transform sigma points into measurement space
+  Eigen::MatrixXd additive_noise_ = Eigen::MatrixXd(3,3);
+  additive_noise_ << std_radr_*std_radr_ , 0 , 0,
+                      0 , std_radphi_*std_radphi_ , 0,
+                      0 , 0 , std_radrd_ * std_radrd_;
+
+  // Measurent space conversion
+  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+      Eigen::MatrixXd radar_measurements_ = Eigen::MatrixXd(3,1);
+      double px_ = Xsig_pred_.col(i)[0];
+      double py_ = Xsig_pred_.col(i)[1];
+      double yaw_ = Xsig_pred_.col(i)[3];
+      double velocity_ = Xsig_pred_.col(i)[2];
+      
+      double rho_ = std::sqrt(std::pow(px_, 2) + std::pow(py_, 2));
+      double phi_ = std::atan2(py_, px_);
+      double rho_dot_ = (px_*std::cos(yaw_)*velocity_ + py_*std::sin(yaw_)*velocity_) / std::sqrt(std::pow(px_,2) + std::pow(py_, 2));
+
+      radar_measurements_ <<  rho_,
+                              phi_,
+                              rho_dot_;
+      Zsig.col(i) = radar_measurements_;
+    }
+  // calculate mean predicted measurement
+  for (int i = 0; i < 2*n_aug_+1; i++) {
+      z_pred_ += weights_(i)*Zsig.col(i);
+  }
+  // calculate innovation covariance matrix S
+  for (int i = 0; i < 2*n_aug_+1; i++) {
+      Eigen::MatrixXd diff_ = Zsig.col(i) - z_pred_;
+      S_ += weights_(i)*(diff_)*(diff_.transpose());
+  }
+
+  // Innovation Covariance for Radar
+  S_ = S_ + additive_noise_;  
+
+  /**
+   * @brief State Matrix and Covariance Matrix Update
+   * 
+   */
+  // Now use the incoming RADAR measurements to update the state 
+  Eigen::VectorXd z_ = Eigen::VectorXd(n_z_);
+  z_ << meas_package.raw_measurements_[0],
+        meas_package.raw_measurements_[1],
+        meas_package.raw_measurements_[2];
+
+  // Calculate the cross correlation matrix
+  Eigen::MatrixXd Tc = Eigen::MatrixXd(n_x_, n_z_);
+
+  Tc.fill(0.0);
+  for (int i = 0; i < 2*n_aug_ + 1; i++) {
+      Eigen::MatrixXd diff_x_ = Xsig_pred_.col(i) - x_;
+      Eigen::MatrixXd diff_meas_ = Zsig.col(i) - z_pred_;
+      Tc += weights_(i)*diff_x_*(diff_meas_.transpose());
+  }
+
+  // calculate Kalman gain K;
+  Eigen::MatrixXd K = Tc * S_.inverse();
+
+  // update state mean and covariance matrix
+  // z-real RADAR measurement and z_pred-predicted measurement
+
+  x_ = x_ + K*(z_ - z_pred_);
+  P_ = P_ - K*S_*K.transpose();
 }
