@@ -5,6 +5,7 @@
  * Initializes Unscented Kalman filter
  */
 UKF::UKF() {
+
   // if this is false, laser measurements will be ignored (except during init)
   use_laser_ = true;
 
@@ -18,10 +19,10 @@ UKF::UKF() {
   P_ = Eigen::MatrixXd(5, 5);
 
   // Predicted Sigma points matrix
-  Eigen::MatrixXd Xsig_pred_ = Eigen::MatrixXd(n_x_, 2*n_aug_ + 1);
+  Xsig_pred_ = Eigen::MatrixXd(n_x_, 2*n_aug_ + 1);
 
   // Initialize the weights vector
-  Eigen::VectorXd weights_ = Eigen::VectorXd(2*n_aug_ + 1);
+  weights_ = Eigen::VectorXd(2*n_aug_ + 1);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 30;
@@ -137,12 +138,31 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // Input the timestamp
     time_us_ = meas_package.timestamp_;
     is_initialized_ = true;
+    return;
   }
 
   /**
    * @brief If the measurement recieved is not the first measurement
    * 
    */
+
+  // Current - previous timestamp
+  double dt = (meas_package.timestamp_ - time_us_) / 1000000.0;
+
+  // Input current time as previous time 
+  time_us_ = meas_package.timestamp_;
+
+  // Prediction step
+  Prediction(dt);
+
+  // Measurement update step
+  if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
+    UpdateLidar(meas_package);
+  }
+
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_) {
+    UpdateRadar(meas_package);
+  }
 }
 
 void UKF::Prediction(double delta_t) {
@@ -347,7 +367,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   // Measurent space conversion
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-      Eigen::MatrixXd radar_measurements_ = Eigen::MatrixXd(n_z_radar_,1);
+      Eigen::VectorXd radar_measurements_ = Eigen::VectorXd(n_z_radar_);
       double px_ = Xsig_pred_.col(i)[0];
       double py_ = Xsig_pred_.col(i)[1];
       double yaw_ = Xsig_pred_.col(i)[3];

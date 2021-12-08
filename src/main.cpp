@@ -10,7 +10,7 @@ int main(int argc, char** argv)
 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
 	viewer->setBackgroundColor(0, 0, 0);
-
+	
 	// set camera position and angle
 	viewer->initCameraParameters();
 	float x_pos = 0;
@@ -19,7 +19,7 @@ int main(int argc, char** argv)
 	Highway highway(viewer);
 
 	//initHighway(viewer);
-
+	
 	int frame_per_sec = 30;
 	int sec_interval = 10;
 	int frame_count = 0;
