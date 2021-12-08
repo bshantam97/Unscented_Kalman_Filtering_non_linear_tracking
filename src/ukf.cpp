@@ -133,7 +133,16 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     } else {
       std::cout << "NO MEASUREMENT RECIEVED" << std::endl;
     }
-  } 
+
+    // Input the timestamp
+    time_us_ = meas_package.timestamp_;
+    is_initialized_ = true;
+  }
+
+  /**
+   * @brief If the measurement recieved is not the first measurement
+   * 
+   */
 }
 
 void UKF::Prediction(double delta_t) {
