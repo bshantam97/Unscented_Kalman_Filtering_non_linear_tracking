@@ -1,6 +1,7 @@
 #ifndef UKF_H
 #define UKF_H
 
+#include <iostream>
 #include "Eigen/Dense"
 #include "measurement_package.h"
 
@@ -95,8 +96,11 @@ class UKF {
   // Sigma point spreading parameter
   double lambda_;
 
-  // Set measurement dimension
-  int n_z_;
+  // Set Radar measurement dimension
+  int n_z_radar_;
+
+  // Set Lidar measurement dimension
+  int n_z_lidar_;
 };
 
 #endif  // UKF_H
