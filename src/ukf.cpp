@@ -25,10 +25,10 @@ UKF::UKF() {
   weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 3.0;
+  std_a_ = 1.5;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 2.5;
+  std_yawdd_ = 1.0;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -273,8 +273,8 @@ void UKF::Prediction(double delta_t) {
   // State Covariance prediction
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
     Eigen::MatrixXd diff_ = Xsig_pred_.col(i) - x_;
-    // while (diff_(3) > M_PI) diff_(3) -= std::atan2(std::sin(diff_(3)), std::cos(diff_(3)));
-    // while (diff_(3) < -M_PI) diff_(3) += std::atan2(std::sin(diff_(3)), std::cos(diff_(3)));
+    while (diff_(3) > M_PI) diff_(3) -= 2.*M_PI;
+    while (diff_(3) < -M_PI) diff_(3) += 2.*M_PI;
     P_ += weights_(i)*(diff_)*(diff_.transpose());
   } 
 }
@@ -428,12 +428,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   Tc.fill(0.0);
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
       Eigen::MatrixXd diff_x_ = Xsig_pred_.col(i) - x_;
-      // while (diff_x_(3)> M_PI) diff_x_(3)-=2.*M_PI;
-      // while (diff_x_(3)<-M_PI) diff_x_(3)+=2.*M_PI;
+      // while (diff_x_(3)> M_PI) diff_x_(3)-=std::atan2(std::sin(diff_x_(3)), std::cos(diff_x_(3)));
+      // while (diff_x_(3)<-M_PI) diff_x_(3)+=std::atan2(std::sin(diff_x_(3)), std::cos(diff_x_(3)));
 
       Eigen::MatrixXd diff_meas_ = Zsig.col(i) - z_pred_;
-      // while (diff_meas_(1)> M_PI) diff_meas_(1)-=2.*M_PI;
-      // while (diff_meas_(1)<-M_PI) diff_meas_(1)+=2.*M_PI;
+      // while (diff_meas_(1)> M_PI) diff_meas_(1)-=std::atan2(std::sin(diff_meas_(1)), std::cos(diff_meas_(1)));
+      // while (diff_meas_(1)<-M_PI) diff_meas_(1)+=std::atan2(std::sin(diff_meas_(1)), std::cos(diff_meas_(1)));
 
       Tc += weights_(i)*diff_x_*(diff_meas_.transpose());
   }
