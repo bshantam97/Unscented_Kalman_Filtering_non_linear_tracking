@@ -18,16 +18,6 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = Eigen::MatrixXd(5, 5);
 
-  // Initialize the covariance matrix. Good starting point is to initialize it with the identity
-  // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
-  // way that we input how much difference we expect between true state and initialzed x vector
-
-  P_ << 1.0,0.0,0.0,0.0,0.0,
-        0.0,1.0,0.0,0.0,0.0,
-        0.0,0.0,1.0,0.0,0.0,
-        0.0,0.0,0.0,1.0,0.0,
-        0.0,0.0,0.0,0.0,1.0;
-
   // Predicted Sigma points matrix
   Xsig_pred_ = Eigen::MatrixXd(5, 15);
 
@@ -35,10 +25,10 @@ UKF::UKF() {
   weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30.0;
+  std_a_ = 3.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30.0;
+  std_yawdd_ = 2.5;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -69,6 +59,9 @@ UKF::UKF() {
    * Hint: one or more values initialized above might be wildly off...
    */
 
+  // Set initialization boolean
+  is_initialized_ = false;
+
   // Normal state dimension
   n_x_ = 5;
 
@@ -89,6 +82,15 @@ UKF::UKF() {
     else weights_(i) = (0.5 / (lambda_+n_aug_));
   }
 
+  // Initialize the covariance matrix. Good starting point is to initialize it with the identity
+  // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
+  // way that we input how much difference we expect between true state and initialzed x vector
+
+  P_ << 1.0,0.0,0.0,0.0,0.0,
+        0.0,1.0,0.0,0.0,0.0,
+        0.0,0.0,1.0,0.0,0.0,
+        0.0,0.0,0.0,1.0,0.0,
+        0.0,0.0,0.0,0.0,1.0;
 }
 
 UKF::~UKF() {}
@@ -302,10 +304,12 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   Eigen::MatrixXd S_ = Eigen::MatrixXd(n_z_lidar_,n_z_lidar_);
 
   // calculate mean predicted measurement
+  z_pred_.fill(0.0);
   for (int i = 0; i < 2*n_aug_+1; i++) {
       z_pred_ += weights_(i)*Zsig.col(i);
   }
   // calculate innovation covariance matrix S
+  S_.fill(0.0);
   for (int i = 0; i < 2*n_aug_+1; i++) {
       Eigen::MatrixXd diff_ = Zsig.col(i) - z_pred_;
       S_ += weights_(i)*(diff_)*(diff_.transpose());
@@ -385,10 +389,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       Zsig.col(i) = radar_measurements_;
     }
   // calculate mean predicted measurement
+  z_pred_.fill(0.0);
   for (int i = 0; i < 2*n_aug_+1; i++) {
       z_pred_ += weights_(i)*Zsig.col(i);
   }
   // calculate innovation covariance matrix S
+  S_.fill(0.0);
   for (int i = 0; i < 2*n_aug_+1; i++) {
       Eigen::MatrixXd diff_ = Zsig.col(i) - z_pred_;
       S_ += weights_(i)*(diff_)*(diff_.transpose());
