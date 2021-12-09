@@ -25,10 +25,10 @@ UKF::UKF() {
   weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 3.0;
+  std_a_ = 1.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 2.5;
+  std_yawdd_ = 0.5;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -114,11 +114,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
        // Initialize the covariance matrix. Good starting point is to initialize it with the identity
       // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
       // way that we input how much difference we expect between true state and initialzed x vector
-      P_ << std_laspx_*std_laspx_,0,0,0,0,
-            0,std_laspy_*std_laspy_,0,0,0,
+      P_ << 1,0,0,0,0,
+            0,1,0,0,0,
             0,0,1,0,0,
-            0,0,0,1,0,
-            0,0,0,0,1;
+            0,0,0,0.0225,0,
+            0,0,0,0,0.0225;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho_ = meas_package.raw_measurements_[0];
@@ -135,12 +135,12 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
       x_ << px_,
             py_,
-            0.3,
+            v_,
             0,
             0;
       P_ << std_radr_*std_radr_, 0, 0, 0, 0,
             0, std_radr_*std_radr_, 0, 0, 0,
-            0, 0, 1, 0, 0,
+            0, 0, std_radrd_*std_radrd_, 0, 0,
             0, 0, 0, std_radphi_, 0,
             0, 0, 0, 0, std_radphi_;
     } else {
@@ -239,7 +239,7 @@ void UKF::Prediction(double delta_t) {
 
     Eigen::MatrixXd process_model_ = Eigen::MatrixXd(5,1);
     // Avoid division by zero
-    if (std::fabs(yaw_rate_) > 0.0001) process_model_ << (velocity / yaw_rate_)*(std::sin(yaw_ + yaw_rate_*delta_t) - std::sin(yaw_)),
+    if (std::fabs(yaw_rate_) > 0.001) process_model_ << (velocity / yaw_rate_)*(std::sin(yaw_ + yaw_rate_*delta_t) - std::sin(yaw_)),
                                                          (velocity / yaw_rate_)*(-std::cos(yaw_ + yaw_rate_*delta_t) + std::cos(yaw_)),
                                                          0.0,
                                                          yaw_rate_*delta_t,
