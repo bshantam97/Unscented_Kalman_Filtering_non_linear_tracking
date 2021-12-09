@@ -19,16 +19,16 @@ UKF::UKF() {
   P_ = Eigen::MatrixXd(5, 5);
 
   // Predicted Sigma points matrix
-  Xsig_pred_ = Eigen::MatrixXd(5, 15);
+  Xsig_pred_ = Eigen::MatrixXd::Zero(5, 15);
 
   // Initialize the weights vector
   weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.0;
+  std_a_ = 3.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.5;
+  std_yawdd_ = 2.5;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -69,7 +69,7 @@ UKF::UKF() {
   n_aug_ = 7;
 
   // Lambda spreading parameter
-  lambda_ = 1;
+  lambda_ = 3-n_x_;
 
   // Measurement dimension for RADAR, measure radius, bearing and rate of change of radius
   n_z_radar_ = 3;
@@ -78,8 +78,8 @@ UKF::UKF() {
 
   // Set weights
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
-    if (i == 0) weights_(i) = (lambda_ / (lambda_ + n_aug_));
-    else weights_(i) = (0.5 / (lambda_+n_aug_));
+    if (i == 0) weights_(i) = (lambda_ / (lambda_ + n_x_));
+    else weights_(i) = (1 / 2*(lambda_+n_x_));
   }
 
   time_us_ = 0;
@@ -141,8 +141,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       P_ << std_radr_*std_radr_, 0, 0, 0, 0,
             0, std_radr_*std_radr_, 0, 0, 0,
             0, 0, std_radrd_*std_radrd_, 0, 0,
-            0, 0, 0, std_radphi_, 0,
-            0, 0, 0, 0, std_radphi_;
+            0, 0, 0, std_radphi_*std_radphi_, 0,
+            0, 0, 0, 0, std_radphi_*std_radphi_;
     } else {
       std::cout << "NO MEASUREMENT RECIEVED" << std::endl;
     }
@@ -273,8 +273,8 @@ void UKF::Prediction(double delta_t) {
   // State Covariance prediction
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
     Eigen::MatrixXd diff_ = Xsig_pred_.col(i) - x_;
-    while (diff_(3) > M_PI) diff_(3) -= 2.*M_PI;
-    while (diff_(3) < -M_PI) diff_(3) += 2.*M_PI;
+    // while (diff_(3) > M_PI) diff_(3) -= std::atan2(std::sin(diff_(3)), std::cos(diff_(3)));
+    // while (diff_(3) < -M_PI) diff_(3) += std::atan2(std::sin(diff_(3)), std::cos(diff_(3)));
     P_ += weights_(i)*(diff_)*(diff_.transpose());
   } 
 }
@@ -428,12 +428,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   Tc.fill(0.0);
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
       Eigen::MatrixXd diff_x_ = Xsig_pred_.col(i) - x_;
-      while (diff_x_(3)> M_PI) diff_x_(3)-=2.*M_PI;
-      while (diff_x_(3)<-M_PI) diff_x_(3)+=2.*M_PI;
+      // while (diff_x_(3)> M_PI) diff_x_(3)-=2.*M_PI;
+      // while (diff_x_(3)<-M_PI) diff_x_(3)+=2.*M_PI;
 
       Eigen::MatrixXd diff_meas_ = Zsig.col(i) - z_pred_;
-      while (diff_meas_(1)> M_PI) diff_meas_(1)-=2.*M_PI;
-      while (diff_meas_(1)<-M_PI) diff_meas_(1)+=2.*M_PI;
+      // while (diff_meas_(1)> M_PI) diff_meas_(1)-=2.*M_PI;
+      // while (diff_meas_(1)<-M_PI) diff_meas_(1)+=2.*M_PI;
 
       Tc += weights_(i)*diff_x_*(diff_meas_.transpose());
   }
