@@ -18,17 +18,27 @@ UKF::UKF() {
   // initial covariance matrix
   P_ = Eigen::MatrixXd(5, 5);
 
+  // Initialize the covariance matrix. Good starting point is to initialize it with the identity
+  // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
+  // way that we input how much difference we expect between true state and initialzed x vector
+
+  P_ << 1.0,0.0,0.0,0.0,0.0,
+        0.0,1.0,0.0,0.0,0.0,
+        0.0,0.0,1.0,0.0,0.0,
+        0.0,0.0,0.0,1.0,0.0,
+        0.0,0.0,0.0,0.0,1.0;
+
   // Predicted Sigma points matrix
-  Xsig_pred_ = Eigen::MatrixXd(n_x_, 2*n_aug_ + 1);
+  Xsig_pred_ = Eigen::MatrixXd(5, 15);
 
   // Initialize the weights vector
-  weights_ = Eigen::VectorXd(2*n_aug_ + 1);
+  weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 30.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 30.0;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -72,15 +82,6 @@ UKF::UKF() {
   n_z_radar_ = 3;
 
   n_z_lidar_ = 2;
-  // Initialize the covariance matrix. Good starting point is to initialize it with the identity
-  // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
-  // way that we input how much difference we expect between true state and initialzed x vector
-
-  P_ << 1,0,0,0,0,
-        0,1,0,0,0,
-        0,0,1,0,0,
-        0,0,0,1,0,
-        0,0,0,0,1;
 
   // Set weights
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
@@ -110,9 +111,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) x_ << meas_package.raw_measurements_[0],
                                                                       meas_package.raw_measurements_[1],
-                                                                      0,
-                                                                      0,
-                                                                      0;
+                                                                      0.0,
+                                                                      0.0,
+                                                                      0.0;
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho_ = meas_package.raw_measurements_[0];
       double phi_ = meas_package.raw_measurements_[1];
@@ -129,8 +130,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       x_ << px_,
             py_,
             v_,
-            0,
-            0;
+            0.0,
+            0.0;
     } else {
       std::cout << "NO MEASUREMENT RECIEVED" << std::endl;
     }
@@ -187,12 +188,12 @@ void UKF::Prediction(double delta_t) {
   Eigen::MatrixXd Xsig_aug_ = Eigen::MatrixXd(n_aug_, 2*n_aug_ + 1);
 
   // Create the augmented mean state
-  x_aug_ << x_, 0, 0;
+  x_aug_ << x_, 0.0, 0.0;
 
   // Augmented Covariance with the noise added
   Eigen::MatrixXd noise_covariance_ = Eigen::MatrixXd(2,2);
-  noise_covariance_ << std_a_ * std_a_ ,0,
-                       0, std_yawdd_*std_yawdd_;
+  noise_covariance_ << std_a_ * std_a_ ,0.0,
+                       0.0, std_yawdd_*std_yawdd_;
   
   P_aug_.fill(0.0);
   P_aug_.topLeftCorner(5,5) = P_;
@@ -206,9 +207,10 @@ void UKF::Prediction(double delta_t) {
   Xsig_aug_.col(0) = x_aug_;
 
   // Generate the Sigma Points
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
-    Xsig_aug_.col(i) = x_aug_ + std::sqrt(n_aug_ + lambda_)*A.col(i-1);
-    Xsig_aug_.col(i+n_aug_) = x_aug_ - std::sqrt(n_aug_ + lambda_)*A.col(i-1);
+  // Lots of indexing errors were here.Debugged
+  for (int i = 0; i < n_aug_; i++) {
+    Xsig_aug_.col(i+1) = x_aug_ + std::sqrt(n_aug_ + lambda_)*A.col(i);
+    Xsig_aug_.col(i+1+n_aug_) = x_aug_ - std::sqrt(n_aug_ + lambda_)*A.col(i);
   }
 
   /**
@@ -216,7 +218,7 @@ void UKF::Prediction(double delta_t) {
    * 
    */
 
-  for (int i = 0; i < Xsig_aug_.cols(); i++) {
+  for (int i = 0; i < 2*n_aug_ + 1; i++) {
     // Coefficients
     double velocity = Xsig_aug_.col(i)[2];
     double yaw_ = Xsig_aug_.col(i)[3];
@@ -226,16 +228,16 @@ void UKF::Prediction(double delta_t) {
 
     Eigen::MatrixXd process_model_ = Eigen::MatrixXd(5,1);
     // Avoid division by zero
-    if (std::fabs(yaw_rate_) > 0.001) process_model_ << (velocity / yaw_rate_)*(std::sin(yaw_ + yaw_rate_*delta_t) - std::sin(yaw_)),
-                                                        (velocity / yaw_rate_)*(-std::cos(yaw_ + yaw_rate_*delta_t) + std::cos(yaw_)),
-                                                        0,
-                                                        yaw_rate_*delta_t,
-                                                        0;
+    if (std::fabs(yaw_rate_) > 0.0001) process_model_ << (velocity / yaw_rate_)*(std::sin(yaw_ + yaw_rate_*delta_t) - std::sin(yaw_)),
+                                                         (velocity / yaw_rate_)*(-std::cos(yaw_ + yaw_rate_*delta_t) + std::cos(yaw_)),
+                                                         0.0,
+                                                         yaw_rate_*delta_t,
+                                                         0.0;
     else process_model_ << velocity*(std::cos(yaw_)*delta_t),
                            velocity*(std::sin(yaw_)*delta_t),
-                           0,
-                           0,
-                           0;
+                           0.0,
+                           0.0,
+                           0.0;
     
     Eigen::MatrixXd process_noise_ = Eigen::MatrixXd(5,1);
     process_noise_ << 0.5*(delta_t*delta_t)*std::cos(yaw_)*acc_noise_,
@@ -276,8 +278,8 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   
   // Noise matrix
   Eigen::MatrixXd additive_noise_ = Eigen::MatrixXd(n_z_lidar_,n_z_lidar_);
-  additive_noise_ << std_laspx_*std_laspx_,0,
-                     0, std_laspy_*std_laspy_;
+  additive_noise_ << std_laspx_*std_laspx_,0.0,
+                     0.0, std_laspy_*std_laspy_;
   
   // Lidar measurement space. This is a matrix of predicted sigma points for the lidar
   Eigen::MatrixXd Zsig = Eigen::MatrixXd(n_z_lidar_, 2*n_aug_ + 1);
@@ -361,9 +363,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   // transform sigma points into measurement space
   Eigen::MatrixXd additive_noise_ = Eigen::MatrixXd(n_z_radar_,n_z_radar_);
-  additive_noise_ << std_radr_*std_radr_ , 0 , 0,
-                      0 , std_radphi_*std_radphi_ , 0,
-                      0 , 0 , std_radrd_ * std_radrd_;
+  additive_noise_ << std_radr_*std_radr_ , 0.0 , 0.0,
+                      0.0 , std_radphi_*std_radphi_ , 0.0,
+                      0.0 , 0.0 , std_radrd_ * std_radrd_;
 
   // Measurent space conversion
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {
