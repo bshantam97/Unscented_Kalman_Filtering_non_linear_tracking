@@ -19,10 +19,10 @@ UKF::UKF() {
   P_ = Eigen::MatrixXd(5, 5);
 
   // Predicted Sigma points matrix
-  Xsig_pred_ = Eigen::MatrixXd(5, 15);
+  Xsig_pred_ = Eigen::MatrixXd::Zero(5, 15);
 
   // Initialize the weights vector
-  weights_ = Eigen::VectorXd(15);
+  weights_ = Eigen::VectorXd::Zero(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 3.0;
@@ -69,7 +69,7 @@ UKF::UKF() {
   n_aug_ = 7;
 
   // Lambda spreading parameter
-  lambda_ = 3 - n_aug_;
+  lambda_ = 3 - n_x_;
 
   // Measurement dimension for RADAR, measure radius, bearing and rate of change of radius
   n_z_radar_ = 3;
@@ -82,15 +82,7 @@ UKF::UKF() {
     else weights_(i) = (0.5 / (lambda_+n_aug_));
   }
 
-  // Initialize the covariance matrix. Good starting point is to initialize it with the identity
-  // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
-  // way that we input how much difference we expect between true state and initialzed x vector
-
-  P_ << 1.0,0.0,0.0,0.0,0.0,
-        0.0,1.0,0.0,0.0,0.0,
-        0.0,0.0,1.0,0.0,0.0,
-        0.0,0.0,0.0,1.0,0.0,
-        0.0,0.0,0.0,0.0,1.0;
+  time_us_ = 0;
 }
 
 UKF::~UKF() {}
@@ -111,11 +103,24 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if (!is_initialized_) {
     std::cout << "Unscented Kalman Filter initialization" << std::endl;
 
-    if (meas_package.sensor_type_ == MeasurementPackage::LASER) x_ << meas_package.raw_measurements_[0],
-                                                                      meas_package.raw_measurements_[1],
-                                                                      0.0,
-                                                                      0.0,
-                                                                      0.0;
+    if (meas_package.sensor_type_ == MeasurementPackage::LASER){
+
+      x_ << meas_package.raw_measurements_[0],
+            meas_package.raw_measurements_[1],
+            0,
+            0,
+            0;
+
+       // Initialize the covariance matrix. Good starting point is to initialize it with the identity
+      // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
+      // way that we input how much difference we expect between true state and initialzed x vector
+      // Reference: https://knowledge.udacity.com/questions/654359
+      P_ << std_laspx_,0,0,0,0,
+            0,std_laspy_,0,0,0,
+            0,0,1,0,0,
+            0,0,0,0.0225,0,
+            0,0,0,0,0.0225;
+    }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho_ = meas_package.raw_measurements_[0];
       double phi_ = meas_package.raw_measurements_[1];
@@ -132,8 +137,15 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       x_ << px_,
             py_,
             v_,
-            0.0,
-            0.0;
+            0,
+            0;
+
+      // Reference: https://knowledge.udacity.com/questions/654359
+      P_ << std_radr_* std_radr_, 0, 0, 0, 0,
+            0, std_radr_ * std_radr_, 0, 0, 0,
+            0, 0, std_radrd_ * std_radrd_, 0, 0,
+            0, 0, 0, std_radphi_ * std_radphi_, 0,
+            0, 0, 0, 0, std_radphi_ * std_radphi_;
     } else {
       std::cout << "NO MEASUREMENT RECIEVED" << std::endl;
     }
@@ -187,7 +199,7 @@ void UKF::Prediction(double delta_t) {
   Eigen::MatrixXd P_aug_ = Eigen::MatrixXd(7,7);
 
   // Generated Sigma Point Matrix
-  Eigen::MatrixXd Xsig_aug_ = Eigen::MatrixXd(n_aug_, 2*n_aug_ + 1);
+  Eigen::MatrixXd Xsig_aug_ = Eigen::MatrixXd::Zero(n_aug_, 2*n_aug_ + 1);
 
   // Create the augmented mean state
   x_aug_ << x_, 0.0, 0.0;
