@@ -19,10 +19,10 @@ UKF::UKF() {
   P_ = Eigen::MatrixXd(5, 5);
 
   // Predicted Sigma points matrix
-  Xsig_pred_ = Eigen::MatrixXd::Zero(5, 15);
+  Xsig_pred_ = Eigen::MatrixXd(5, 15);
 
   // Initialize the weights vector
-  weights_ = Eigen::VectorXd::Zero(15);
+  weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 3.0;
@@ -69,7 +69,7 @@ UKF::UKF() {
   n_aug_ = 7;
 
   // Lambda spreading parameter
-  lambda_ = 3 - n_x_;
+  lambda_ = 1;
 
   // Measurement dimension for RADAR, measure radius, bearing and rate of change of radius
   n_z_radar_ = 3;
@@ -114,12 +114,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
        // Initialize the covariance matrix. Good starting point is to initialize it with the identity
       // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
       // way that we input how much difference we expect between true state and initialzed x vector
-      // Reference: https://knowledge.udacity.com/questions/654359
-      P_ << std_laspx_,0,0,0,0,
-            0,std_laspy_,0,0,0,
+      P_ << std_laspx_*std_laspx_,0,0,0,0,
+            0,std_laspy_*std_laspy_,0,0,0,
             0,0,1,0,0,
-            0,0,0,0.0225,0,
-            0,0,0,0,0.0225;
+            0,0,0,1,0,
+            0,0,0,0,1;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho_ = meas_package.raw_measurements_[0];
@@ -136,16 +135,14 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
       x_ << px_,
             py_,
-            v_,
+            0.3,
             0,
             0;
-
-      // Reference: https://knowledge.udacity.com/questions/654359
-      P_ << std_radr_* std_radr_, 0, 0, 0, 0,
-            0, std_radr_ * std_radr_, 0, 0, 0,
-            0, 0, std_radrd_ * std_radrd_, 0, 0,
-            0, 0, 0, std_radphi_ * std_radphi_, 0,
-            0, 0, 0, 0, std_radphi_ * std_radphi_;
+      P_ << std_radr_*std_radr_, 0, 0, 0, 0,
+            0, std_radr_*std_radr_, 0, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 0, std_radphi_, 0,
+            0, 0, 0, 0, std_radphi_;
     } else {
       std::cout << "NO MEASUREMENT RECIEVED" << std::endl;
     }
@@ -199,7 +196,7 @@ void UKF::Prediction(double delta_t) {
   Eigen::MatrixXd P_aug_ = Eigen::MatrixXd(7,7);
 
   // Generated Sigma Point Matrix
-  Eigen::MatrixXd Xsig_aug_ = Eigen::MatrixXd::Zero(n_aug_, 2*n_aug_ + 1);
+  Eigen::MatrixXd Xsig_aug_ = Eigen::MatrixXd(n_aug_, 2*n_aug_ + 1);
 
   // Create the augmented mean state
   x_aug_ << x_, 0.0, 0.0;
@@ -250,7 +247,7 @@ void UKF::Prediction(double delta_t) {
     else process_model_ << velocity*(std::cos(yaw_)*delta_t),
                            velocity*(std::sin(yaw_)*delta_t),
                            0.0,
-                           0.0,
+                           yaw_rate_*delta_t,
                            0.0;
     
     Eigen::MatrixXd process_noise_ = Eigen::MatrixXd(5,1);
@@ -431,7 +428,13 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   Tc.fill(0.0);
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
       Eigen::MatrixXd diff_x_ = Xsig_pred_.col(i) - x_;
+      while (diff_x_(3)> M_PI) diff_x_(3)-=2.*M_PI;
+      while (diff_x_(3)<-M_PI) diff_x_(3)+=2.*M_PI;
+
       Eigen::MatrixXd diff_meas_ = Zsig.col(i) - z_pred_;
+      while (diff_meas_(1)> M_PI) diff_meas_(1)-=2.*M_PI;
+      while (diff_meas_(1)<-M_PI) diff_meas_(1)+=2.*M_PI;
+
       Tc += weights_(i)*diff_x_*(diff_meas_.transpose());
   }
 
