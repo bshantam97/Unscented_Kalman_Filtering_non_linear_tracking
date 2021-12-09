@@ -25,10 +25,10 @@ UKF::UKF() {
   weights_ = Eigen::VectorXd(15);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.5;
+  std_a_ = 1.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 1.0;
+  std_yawdd_ = 0.5;
   
   /**
    * DO NOT MODIFY measurement noise values below.
@@ -114,11 +114,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
        // Initialize the covariance matrix. Good starting point is to initialize it with the identity
       // matrix and maintain the property of P being symmetric. Another way is to initialize it ina 
       // way that we input how much difference we expect between true state and initialzed x vector
-      P_ << 1,0,0,0,0,
-            0,1,0,0,0,
+      P_ << std_laspx_*std_laspx_,0,0,0,0,
+            0,std_laspy_*std_laspy_,0,0,0,
             0,0,1,0,0,
-            0,0,0,0.0225,0,
-            0,0,0,0,0.0225;
+            0,0,0,1,0,
+            0,0,0,0,1;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho_ = meas_package.raw_measurements_[0];
@@ -131,7 +131,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
       double vx_ = rho_dot_ * std::cos(phi_);
       double vy_ = rho_dot_ * std::sin(phi_);
-      double v_ = std::sqrt(vx_*vx_ + vy_*vy_);
+      double v_ = rho_dot_;   //std::sqrt(vx_*vx_ + vy_*vy_);
 
       x_ << px_,
             py_,
@@ -165,7 +165,46 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   time_us_ = meas_package.timestamp_;
 
   // Prediction step
-  Prediction(dt);
+  // Reset the values at each iteration
+  if (meas_package.sensor_type_ == MeasurementPackage::LASER){
+
+    x_ << meas_package.raw_measurements_[0],
+          meas_package.raw_measurements_[1],
+          0,
+          0,
+          0;
+    P_ << std_laspx_*std_laspx_,0,0,0,0,
+          0,std_laspy_*std_laspy_,0,0,0,
+          0,0,1,0,0,
+          0,0,0,1,0,
+          0,0,0,0,1;
+    Prediction(dt);
+  }else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    const double rho_ = meas_package.raw_measurements_[0];
+    const double phi_ = meas_package.raw_measurements_[1];
+    const double rho_dot_ = meas_package.raw_measurements_[2];
+
+    // Analyze vector components
+    const double px_ = rho_*std::cos(phi_);
+    const double py_ = rho_*std::sin(phi_);
+
+    const double vx_ = rho_dot_ * std::cos(phi_);
+    const double vy_ = rho_dot_ * std::sin(phi_);
+    const double v_ = rho_dot_; // std::sqrt(vx_*vx_ + vy_*vy_);
+
+    x_ << px_,
+          py_,
+          v_,
+          0,
+          0;
+
+    P_ << std_radr_*std_radr_, 0, 0, 0, 0,
+          0, std_radr_*std_radr_, 0, 0, 0,
+          0, 0, std_radrd_*std_radrd_, 0, 0,
+          0, 0, 0, std_radphi_*std_radphi_, 0,
+          0, 0, 0, 0, std_radphi_*std_radphi_;
+    Prediction(dt);
+  }
 
   // Measurement update step
   if (meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_) {
@@ -273,8 +312,7 @@ void UKF::Prediction(double delta_t) {
   // State Covariance prediction
   for (int i = 0; i < 2*n_aug_ + 1; i++) {
     Eigen::MatrixXd diff_ = Xsig_pred_.col(i) - x_;
-    while (diff_(3) > M_PI) diff_(3) -= 2.*M_PI;
-    while (diff_(3) < -M_PI) diff_(3) += 2.*M_PI;
+    diff_(3) = std::atan2(std::sin(diff_(3)), std::cos(diff_(3)));
     P_ += weights_(i)*(diff_)*(diff_.transpose());
   } 
 }
